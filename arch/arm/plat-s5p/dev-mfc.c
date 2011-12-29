@@ -13,6 +13,7 @@
 #include <linux/kernel.h>
 #include <linux/string.h>
 #include <linux/platform_device.h>
+#include <linux/dma-contiguous.h>
 #include <mach/map.h>
 #include <asm/irq.h>
 #include <plat/mfc.h>
@@ -63,3 +64,14 @@ void __init s3c_mfc_set_platdata(struct s3c_platform_mfc *pd)
 		(u32)s5p_get_media_memsize_bank(S5P_MDEV_MFC, 1);
 }
 
+void __init s5p_mfc_reserve_mem(phys_addr_t rbase, unsigned int rsize,
+				phys_addr_t lbase, unsigned int lsize)
+{
+	if (dma_declare_contiguous(&s5p_device_mfc_r.dev, rsize, rbase, 0))
+		printk(KERN_ERR "Failed to reserve memory for MFC device (%u bytes at 0x%08lx)\n",
+		       rsize, (unsigned long) rbase);
+
+	if (dma_declare_contiguous(&s5p_device_mfc_l.dev, lsize, lbase, 0))
+		printk(KERN_ERR "Failed to reserve memory for MFC device (%u bytes at 0x%08lx)\n",
+		       rsize, (unsigned long) rbase);
+}
