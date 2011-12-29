@@ -20,6 +20,7 @@
 #include <linux/gfp.h>
 #include <linux/memblock.h>
 #include <linux/sort.h>
+#include <linux/dma-contiguous.h>
 
 #include <asm/mach-types.h>
 #include <asm/prom.h>
@@ -225,6 +226,17 @@ static void __init arm_adjust_dma_zone(unsigned long *size, unsigned long *hole,
 }
 #endif
 
+void __init setup_dma_zone(struct machine_desc *mdesc)
+{
+#ifdef CONFIG_ZONE_DMA
+	if (mdesc->dma_zone_size) {
+		arm_dma_zone_size = mdesc->dma_zone_size;
+		arm_dma_limit = PHYS_OFFSET + arm_dma_zone_size - 1;
+	} else
+		arm_dma_limit = 0xffffffff;
+#endif
+}
+
 static void __init arm_bootmem_free(unsigned long min, unsigned long max_low,
 	unsigned long max_high)
 {
@@ -276,8 +288,9 @@ static void __init arm_bootmem_free(unsigned long min, unsigned long max_low,
 	 * Adjust the sizes according to any special requirements for
 	 * this machine type.
 	 */
-	arm_adjust_dma_zone(zone_size, zhole_size,
-		ARM_DMA_ZONE_SIZE >> PAGE_SHIFT);
+	if (arm_dma_zone_size)
+        	arm_adjust_dma_zone(zone_size, zhole_size,
+	        	ARM_DMA_ZONE_SIZE >> PAGE_SHIFT);
 #endif
 
 	free_area_init_node(0, zone_size, min, zhole_size);
@@ -359,6 +372,13 @@ void __init arm_memblock_init(struct meminfo *mi, struct machine_desc *mdesc)
 		mdesc->reserve();
 
 	memblock_analyze();
+	/*
+	 * reserve memory for DMA contigouos allocations,
+	 * must come from DMA area inside low memory
+	 */
+	dma_contiguous_reserve(arm_dma_limit < arm_lowmem_limit ?
+			       arm_dma_limit : arm_lowmem_limit);
+
 	memblock_dump_all();
 }
 
